@@ -22,6 +22,5 @@ def main():
         write_clients(file, clients)
         write_networks(file)
 
-
 if __name__ == "__main__":
     main()

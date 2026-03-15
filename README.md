@@ -159,6 +159,15 @@ El archivo Docker Compose se genera en el siguiente orden:
 
 Esto permite generar automáticamente un archivo Compose válido con la cantidad de clientes especificada.
 
+#### Test
+
+Recomendado `sudo usermod -aG docker $USER`
+Ejecutar test `pytest -v test_ej1.py`
+
+##### Resultados de los tests
+
+![Resultados de ej1](tests/ej1-tests.png)
+
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera reconstruír las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida por fuera de la imagen (hint: `docker volumes`).
 
