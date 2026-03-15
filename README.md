@@ -171,6 +171,49 @@ Ejecutar test `pytest -v test_ej1.py`
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera reconstruír las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida por fuera de la imagen (hint: `docker volumes`).
 
+#### Resolución
+
+Para la resolución del ejercicio se mantiene la misma estructura utilizada en el ejercicio N.º 1. La diferencia principal es que se agregan volúmenes (volumes) en Docker Compose para montar y persistir los archivos de configuración dentro de los contenedores.
+
+De esta manera, los cambios en los archivos de configuración no requieren reconstruir (rebuild) las imágenes de Docker de cada servicio, sino únicamente reiniciar los contenedores para que los cambios tomen efecto.
+
+Adicionalmente, para que los tests se ejecuten correctamente, se elimina el LOG_LEVEL hardcodeado en las clases responsables de generar el archivo docker-compose, permitiendo que dicho valor sea tomado desde los archivos de configuración montados mediante los volúmenes.
+
+##### Resultados de los tests
+
+![Resultados de ej2](tests/ej2-tests.png)
+
+##### Ejecución
+
+Se provee el archivo `generar-compose.sh` en la raíz del proyecto.
+
+El script recibe dos parámetros:
+
+1. Nombre del archivo de salida
+2. Cantidad de clientes a generar
+
+Ejemplo de ejecución desde la raíz del proyecto:
+
+```bash
+./generar-compose.sh docker-compose-dev.yaml 5
+```
+
+En este ejemplo se genera un archivo `docker-compose-dev.yaml` con cinco servicios cliente (`client1` a `client5`).
+
+---
+
+##### Estructura del proyecto
+
+La lógica de generación del archivo Docker Compose se implementó en Python dentro del directorio `tools`.
+
+```
+tools/
+ ├─ generator.py
+ ├─ common_writer.py
+ ├─ server_writer.py
+ ├─ clients_writer.py
+ └─ networks_writer.py
+```
 
 ### Ejercicio N°3:
 Crear un script de bash `validar-echo-server.sh` que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un echo server, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado.

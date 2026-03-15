@@ -7,10 +7,8 @@ def server_template():
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-      - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
-
 """
 
 def write_server(file):
