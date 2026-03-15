@@ -1,20 +1,12 @@
-def client_template(i):
-
-    return f"""  client{i}:
-    container_name: client{i}
-    image: client:latest
-    entrypoint: /client
-    environment:
-      - CLI_ID={i}
-      - CLI_LOG_LEVEL=DEBUG
-    networks:
-      - testing_net
-    depends_on:
-      - server
-
+def networks_template():
+    return """
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24
 """
 
-def write_clients(file, cantidad):
-
-    for i in range(1, cantidad + 1):
-        file.write(client_template(i))
+def write_networks(file):
+    file.write(networks_template())
