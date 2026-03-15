@@ -3,6 +3,8 @@ def client_template(i):
     return f"""  client{i}:
     container_name: client{i}
     image: client:latest
+    volumes:
+      - ./client/config.yaml: /config.yaml
     entrypoint: /client
     environment:
       - CLI_ID={i}

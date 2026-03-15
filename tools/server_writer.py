@@ -2,6 +2,8 @@ def server_template():
     return """  server:
     container_name: server
     image: server:latest
+    volumes:
+      - ./server: /
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
