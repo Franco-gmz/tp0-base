@@ -3,7 +3,7 @@ def server_template():
     container_name: server
     image: server:latest
     volumes:
-      - ./server: /
+      - ./server/config.yaml:/config.yaml
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
