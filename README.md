@@ -239,7 +239,7 @@ Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful
 
 Para la resolución del ejercicio se implementa el cliente en python debido a una mayor afinidad con este lenguaje.
 
-En este ejercicio se implementa de un manejo correcto de señales del sistema operativo, en particular SIGTERM, para garantizar un apagado controlado (graceful shutdown) de los contenedores.
+En este ejercicio se implementa el manejo correcto de señales del sistema operativo, en particular SIGTERM, para garantizar un apagado controlado (graceful shutdown) de los contenedores.
 
 En el caso del cliente, se implementa un handler de señal que:
 
