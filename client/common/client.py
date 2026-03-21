@@ -5,40 +5,6 @@ import signal
 
 log = logging.getLogger("log")
 
-
-class ClientConfig:
-    def __init__(self, client_id, server_address, loop_amount, loop_period):
-        self.ID = client_id
-        self.ServerAddress = server_address
-        self.LoopAmount = loop_amount
-        self.LoopPeriod = loop_period
-
-
-class Client:
-    def __init__(self, config):
-        self.config = config
-        self.conn = None
-
-    def create_client_socket(self):
-        try:
-            host, port = self.config.ServerAddress.split(":")
-            self.conn = socket.create_connection((host, int(port)))
-        except Exception as err:
-            log.critical(
-                "action: connect | result: fail | client_id: %s | error: %s",
-                self.config.ID,
-                err,
-            )
-            return err
-        return None
-    
-    def handle_signal(self, sgl, frame):
-        if sgl == signal.SIGTERM:
-            log.info('action: receive_signal | result: success | signal: SIGTERM')
-            self.conn.close()
-
-log = logging.getLogger("log")
-
 class ClientConfig:
     def __init__(self, client_id, server_address, loop_amount, loop_period):
         self.ID = client_id
