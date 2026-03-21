@@ -37,13 +37,7 @@ class Client:
             log.info('action: receive_signal | result: success | signal: SIGTERM')
             self.conn.close()
 
-    import logging
-import socket
-import time
-import signal
-
 log = logging.getLogger("log")
-
 
 class ClientConfig:
     def __init__(self, client_id, server_address, loop_amount, loop_period):
@@ -89,9 +83,7 @@ class Client:
                 return
 
             try:
-                self.conn.sendall(
-                    f"[CLIENT {self.config.ID}] Message N°{msg_id}\n".encode("utf-8")
-                )
+                self.conn.sendall(f"[CLIENT {self.config.ID}] Message N°{msg_id}\n".encode("utf-8"))
 
                 msg = b""
                 while not msg.endswith(b"\n"):
@@ -105,11 +97,7 @@ class Client:
             except Exception as err:
                 if self._shutting_down:
                     return
-                log.error(
-                    "action: receive_message | result: fail | client_id: %s | error: %s",
-                    self.config.ID,
-                    err,
-                )
+                log.error("action: receive_message | result: fail | client_id: %s | error: %s", self.config.ID, err)
                 return
 
             finally:
@@ -124,30 +112,12 @@ class Client:
                 return
 
             if not msg.endswith(b"\n"):
-                log.error(
-                    "action: receive_message | result: fail | client_id: %s | error: connection closed before newline",
-                    self.config.ID,
-                )
+                log.error("action: receive_message | result: fail | client_id: %s | error: connection closed before newline", self.config.ID)
                 return
 
             decoded_msg = msg.decode("utf-8")
 
-            log.info(
-                "action: receive_message | result: success | client_id: %s | msg: %s",
-                self.config.ID,
-                decoded_msg,
-            )
+            log.info("action: receive_message | result: success | client_id: %s | msg: %s", self.config.ID, decoded_msg)
+            time.sleep(self.config.LoopPeriod)
 
-            slept = 0.0
-            step = 0.1
-            while slept < self.config.LoopPeriod:
-                if self._shutting_down:
-                    return
-                remaining = self.config.LoopPeriod - slept
-                time.sleep(step if remaining > step else remaining)
-                slept += step if remaining > step else remaining
-
-        log.info(
-            "action: loop_finished | result: success | client_id: %s",
-            self.config.ID,
-        )
+        log.info("action: loop_finished | result: success | client_id: %s", self.config.ID)
