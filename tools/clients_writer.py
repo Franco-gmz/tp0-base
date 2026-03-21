@@ -4,8 +4,8 @@ def client_template(i):
     container_name: client{i}
     image: client:latest
     volumes:
-      - ./client/config.yaml:/config.yaml
-    entrypoint: /client
+      - ./client/config.ini:/config.ini
+    entrypoint: python3 /main.py
     environment:
       - CLI_ID={i}
     networks:
