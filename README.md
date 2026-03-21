@@ -235,6 +235,48 @@ Se provee el archivo `validar-echo-server.sh` en la raíz del proyecto.
 ### Ejercicio N°4:
 Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
 
+#### Resolución
+
+Para la resolución del ejercicio se implementa el cliente en python debido a una mayor afinidad con este lenguaje.
+
+En este ejercicio se implementa de un manejo correcto de señales del sistema operativo, en particular SIGTERM, para garantizar un apagado controlado (graceful shutdown) de los contenedores.
+
+En el caso del cliente, se implementa un handler de señal que:
+
+- Registra la recepción de SIGTERM
+- Cierra cualquier conexión activa con el servidor
+- Interrumpe el loop de ejecución
+- Finaliza el proceso de forma controlada con código de salida exitoso
+
+Para lograr esto, se introduce el flag interno `_shutting_down` que permite detener la ejecución en distintos puntos del flujo:
+
+- Antes de iniciar una nueva iteración
+- Durante la recepción de datos
+- Durante el período de espera entre iteraciones
+
+En el caso del servidor, se implementa un handler para la señal SIGTERM, el cual permite:
+
+- Detener la aceptación de nuevas conexiones
+- Cerrar el socket principal del servidor
+- Finalizar todas las conexiones activas con los clientes
+- Terminar la ejecución del proceso de forma ordenada
+
+Para esto, el servidor mantiene una colección de sockets de clientes activos, lo que permite iterar sobre ellos y cerrarlos explícitamente al momento de recibir la señal.
+
+Adicionalmente, se introduce el flag interno `_server_running` que permite interrumpir el loop principal de aceptación de conexiones. Esto evita que el servidor continúe bloqueado esperando nuevas conexiones (accept) luego de recibir la señal de terminación.
+
+El cierre del socket principal provoca que cualquier operación bloqueante sobre el mismo (como accept) falle, permitiendo salir del loop de manera controlada.
+
+De esta forma, se garantiza que:
+
+- No queden conexiones abiertas
+- No se produzcan errores inesperados por sockets colgantes
+- El proceso finalice correctamente con código de salida exitoso
+
+##### Resultados de los tests
+
+![Resultados de ej4](tests/ej4-tests.png)
+
 ## Parte 2: Repaso de Comunicaciones
 
 Las secciones de repaso del trabajo práctico plantean un caso de uso denominado **Lotería Nacional**. Para la resolución de las mismas deberá utilizarse como base el código fuente provisto en la primera parte, con las modificaciones agregadas en el ejercicio 4.
