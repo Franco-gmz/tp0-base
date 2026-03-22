@@ -340,6 +340,7 @@ Este enfoque permite mantener una arquitectura más clara, donde el dominio es i
 
 Se definió una estructura de carpetas orientada a separar claramente las responsabilidades entre dominio, protocolo de comunicación y utilidades de bajo nivel:
 
+```
 ├── domain/
 │ └── agency_bet.py
 ├── protocol/
@@ -347,6 +348,7 @@ Se definió una estructura de carpetas orientada a separar claramente las respon
 │ └── serializer.py
 ├── utils/
 │ └── socket_utils.py
+```
 
 
 ###### `domain/`
