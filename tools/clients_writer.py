@@ -8,6 +8,11 @@ def client_template(i):
     entrypoint: python3 /main.py
     environment:
       - CLI_ID={i}
+      - NOMBRE=NOMBRE{i}
+      - APELLIDO=APELLIDO{i}
+      - DOCUMENTO={i}{i}{i}{i}{i}{i}{i}{i}
+      - NACIMIENTO=1998-01-04
+      - NUMERO={i}
     networks:
       - testing_net
     depends_on:

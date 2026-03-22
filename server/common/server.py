@@ -1,6 +1,10 @@
 import socket
 import logging
 import signal
+from protocol.serializer import serialize_bet, deserialize_bet
+from protocol.message import Message, MessageType
+from domain.agency_bet import AgencyBet
+from common.utils import Bet, store_agency_bets
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -81,12 +85,17 @@ class Server:
         client socket will also be closed
         """
         try:
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(
-                f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}'
-            )
-            client_sock.send(f"{msg}\n".encode('utf-8'))
+            msg = Message.from_socket(client_sock)
+
+            if msg.type == MessageType.BET:
+                agency_bet = deserialize_bet(msg.payload)
+                store_agency_bets([agency_bet])
+                
+                logging.info(f'action: apuesta_almacenada | result: success | dni: {agency_bet.dni} | numero: {agency_bet.bet_number}')
+
+                payload = serialize_bet(agency_bet)
+                msg = Message(MessageType.ACK, payload)
+                client_sock.sendall(msg.to_bytes())
 
         except OSError as e:
             logging.error(f'action: receive_message | result: fail | error: {e}')

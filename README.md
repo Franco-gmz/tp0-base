@@ -302,6 +302,167 @@ Se deberá implementar un módulo de comunicación entre el cliente y el servido
 * Correcta separación de responsabilidades entre modelo de dominio y capa de comunicación.
 * Correcto empleo de sockets, incluyendo manejo de errores y evitando los fenómenos conocidos como [_short read y short write_](https://cs61.seas.harvard.edu/site/2018/FileDescriptors/).
 
+#### Resolución
+
+Para este ejercicio se tomó la decisión de definir una entidad de dominio propia denominada `AgencyBet`, en lugar de reutilizar directamente la estructura `Bet` provista por la cátedra.
+
+La motivación principal de esta decisión radica en que la definición de `Bet` se encuentra acoplada al servidor, mientras que en este diseño se considera que una apuesta debe ser una entidad conocida tanto por el cliente como por el servidor. Esto permite:
+
+- Definir de forma explícita la estructura de la apuesta que viaja por el protocolo.
+- Mantener consistencia entre lo que el cliente envía y lo que el servidor procesa.
+- Desacoplar el modelo de dominio del detalle de implementación del servidor.
+
+En este contexto, `AgencyBet` representa la apuesta en el dominio de la aplicación, y es la estructura utilizada tanto para la serialización en el cliente como para la deserialización en el servidor.
+
+##### Adaptación a la función provista por la cátedra
+
+Dado que la función `store_bets(...)` provista por la cátedra espera objetos del tipo `Bet`, se implementó un wrapper encargado de realizar la transformación desde `AgencyBet` hacia `Bet`.
+
+Este wrapper permite:
+
+- Respetar la interfaz exigida por la cátedra sin modificar su implementación.
+- Mantener el modelo de dominio propio (`AgencyBet`) aislado de detalles externos.
+- Centralizar la conversión en un único punto del sistema.
+
+De esta forma, el flujo queda definido de la siguiente manera:
+
+1. El cliente construye un `AgencyBet`.
+2. El `AgencyBet` se serializa y se envía al servidor mediante el protocolo definido.
+3. El servidor deserializa el mensaje nuevamente a `AgencyBet`.
+4. El wrapper transforma el `AgencyBet` a `Bet`.
+5. Se invoca `store_bets(...)` con el tipo esperado.
+
+Este enfoque permite mantener una arquitectura más clara, donde el dominio es independiente del transporte y de las restricciones impuestas por componentes externos.
+
+---
+
+##### Estructura del proyecto
+
+Se definió una estructura de carpetas orientada a separar claramente las responsabilidades entre dominio, protocolo de comunicación y utilidades de bajo nivel:
+
+├── domain/
+│ └── agency_bet.py
+├── protocol/
+│ ├── message.py
+│ └── serializer.py
+├── utils/
+│ └── socket_utils.py
+
+
+###### `domain/`
+
+Contiene las entidades del dominio de la aplicación.
+
+- `agency_bet.py`: define la clase `AgencyBet`, que representa una apuesta dentro del sistema.
+
+Esta capa es completamente independiente del protocolo y de la comunicación por sockets. Su única responsabilidad es modelar los datos de negocio.
+
+---
+
+###### `protocol/`
+
+Encapsula toda la lógica relacionada con la comunicación entre cliente y servidor.
+
+- `message.py`: define la estructura del mensaje del protocolo (`Message`), incluyendo:
+  - tipo de mensaje (`MessageType`)
+  - payload
+  - serialización (`to_bytes`)
+  - deserialización desde socket (`from_socket`)
+
+- `serializer.py`: contiene la lógica de serialización y deserialización del dominio:
+  - `serialize_bet(...)`: transforma un `AgencyBet` en `bytes`
+  - `deserialize_bet(...)`: reconstruye un `AgencyBet` a partir de `bytes`
+
+Esta separación permite desacoplar:
+- la estructura del mensaje (header + payload)
+- del contenido del mensaje (la apuesta en sí)
+
+---
+
+###### `utils/`
+
+Contiene utilidades de bajo nivel relacionadas con el manejo de sockets.
+
+- `socket_utils.py`: implementa funciones auxiliares como `recv_exact(...)`, que garantiza la lectura completa de bytes desde el socket, evitando problemas de *short read* propios de TCP.
+
+Esta capa no conoce el dominio ni el protocolo, solo se encarga de operaciones básicas de transporte.
+
+---
+
+##### Protocolo de comunicación
+
+Se implementó un protocolo binario simple para el intercambio de mensajes entre cliente y servidor.
+
+###### Estructura del mensaje
+
+Cada mensaje está compuesto por:
+
+[TYPE][LENGTH][PAYLOAD]
+1B 2B N bytes
+
+- **TYPE (1 byte):** identifica el tipo de mensaje
+  - `BET` (1): envío de apuesta
+  - `ACK` (2): confirmación del servidor
+  - `ERROR` (3): mensaje de error
+
+- **LENGTH (2 bytes):** tamaño del payload en bytes, codificado en *big-endian*
+
+- **PAYLOAD (N bytes):** contenido del mensaje
+
+---
+
+###### Serialización del payload
+
+El payload de una apuesta (`AgencyBet`) se serializa como un string delimitado por `|`, luego codificado en UTF-8. Por ejemplo:
+
+`Franco|Gomez|30904465|1999-03-17|7574`
+
+---
+
+##### Flujo de comunicación
+
+El intercambio entre cliente y servidor sigue los siguientes pasos:
+
+1. El cliente construye un `AgencyBet`.
+2. El `AgencyBet` se serializa a bytes.
+3. Se construye un `Message` de tipo `BET` con ese payload.
+4. El cliente envía el mensaje al servidor.
+5. El servidor:
+   - recibe el mensaje
+   - deserializa el payload a `AgencyBet`
+   - almacena la apuesta
+6. El servidor responde con un mensaje `ACK`.
+7. El cliente recibe el `ACK`, lo deserializa y registra el resultado por log.
+
+---
+
+##### Manejo de TCP
+
+Dado que TCP no garantiza la lectura completa en una sola operación, se implementó:
+
+- `recv_exact(...)`: asegura la lectura de la cantidad exacta de bytes necesarios para reconstruir el mensaje completo (header + payload)
+
+Esto evita problemas de:
+- *short read*
+- lectura parcial de mensajes
+
+---
+
+##### Conclusión
+
+El diseño separa claramente:
+
+- **Dominio (`domain/`)** → qué es una apuesta  
+- **Protocolo (`protocol/`)** → cómo se representa y transmite  
+- **Transporte (`utils/`)** → cómo se envían y reciben bytes  
+
+Lo cual permite una solución modular, extensible y desacoplada.
+
+
+##### Resultados de los tests
+
+![Resultados de ej5](tests/ej5-tests.png)
+
 
 ### Ejercicio N°6:
 Modificar los clientes para que envíen varias apuestas a la vez (modalidad conocida como procesamiento por _chunks_ o _batchs_). 

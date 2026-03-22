@@ -1,7 +1,7 @@
 import csv
 import datetime
 import time
-
+from domain.agency_bet import AgencyBet
 
 """ Bets storage location. """
 STORAGE_FILEPATH = "./bets.csv"
@@ -49,3 +49,9 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
+def store_agency_bets(bets: list[AgencyBet]) -> None:
+    bet_collection = []
+    for bet in bets:
+        bet = Bet("1", bet.name, bet.lastname, bet.dni, bet.birth_date, bet.bet_number)
+        bet_collection.append(bet)
+    store_bets(bet_collection)

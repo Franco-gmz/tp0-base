@@ -1,5 +1,12 @@
 FROM python:3.9.7-slim
+
 COPY client /
+COPY protocol /protocol
+COPY domain /domain
+COPY utils /utils
+
+WORKDIR /
+
 ENTRYPOINT ["/bin/sh"]
 
 # FROM golang:1.17 AS builder
