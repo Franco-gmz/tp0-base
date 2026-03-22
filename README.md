@@ -393,7 +393,7 @@ Esta capa no conoce el dominio ni el protocolo, solo se encarga de operaciones b
 
 ##### Protocolo de comunicación
 
-Se implementó un protocolo binario simple para el intercambio de mensajes entre cliente y servidor.
+Se implementó un protocolo simple para el intercambio de mensajes entre cliente y servidor.
 
 ###### Estructura del mensaje
 
