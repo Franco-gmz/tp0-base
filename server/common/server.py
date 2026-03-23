@@ -78,27 +78,34 @@ class Server:
         logging.info('action: shutdown_server | result: success')
 
     def __handle_client_connection(self, client_sock):
-        """
-        Read message from a specific client socket and closes the socket
-
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
         try:
-            msg = Message.from_socket(client_sock)
+            while True:
+                msg = Message.from_socket(client_sock)
 
-            if msg.type == MessageType.BET:
-                agency_bet = deserialize_bet(msg.payload)
-                store_agency_bets([agency_bet])
-                
-                logging.info(f'action: apuesta_almacenada | result: success | dni: {agency_bet.dni} | numero: {agency_bet.bet_number}')
+                if msg.type != MessageType.BET:
+                    logging.info("action: apuesta_recibida | result: fail | cantidad: 0")
 
-                payload = serialize_bet(agency_bet)
-                msg = Message(MessageType.ACK, payload)
-                client_sock.sendall(msg.to_bytes())
+                    error_msg = Message(MessageType.ERROR)
+                    client_sock.sendall(error_msg.to_bytes())
+                    continue
 
-        except OSError as e:
-            logging.error(f'action: receive_message | result: fail | error: {e}')
+                try:
+                    bets = [deserialize_bet(p.payload) for p in msg.payloads]
+                    store_agency_bets(bets)
+
+                    logging.info("action: apuesta_recibida | result: success | cantidad: %s", msg.payload_count)
+                    ack_msg = Message(MessageType.ACK)
+                    client_sock.sendall(ack_msg.to_bytes())
+
+                except Exception:
+                    logging.info("action: apuesta_recibida | result: fail | cantidad: %s", msg.payload_count)
+
+                    error_msg = Message(MessageType.ERROR)
+                    client_sock.sendall(error_msg.to_bytes())
+
+        except ConnectionError:
+            # Client closes connection gracefully
+            pass
 
         finally:
             try:
@@ -108,15 +115,12 @@ class Server:
 
             try:
                 client_sock.close()
-                logging.info(
-                    f'action: close_client_socket | result: success | ip: {peername[0]} | port: {peername[1]}'
-                )
+                logging.info("action: close_client_socket | result: success | ip: %s | port: %s", peername[0], peername[1])
             except OSError as e:
-                logging.error(
-                    f'action: close_client_socket | result: fail | ip: {peername[0]} | port: {peername[1]} | error: {e}'
-                )
+                logging.error("action: close_client_socket | result: fail | ip: %s | port: %s | error: %s", peername[0], peername[1], e)
             finally:
-                self.remove_client(client_sock)
+                if client_sock in self._client_sockets:
+                    self.remove_client(client_sock)
 
     def __accept_new_connection(self):
         """

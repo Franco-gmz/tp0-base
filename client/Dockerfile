@@ -7,6 +7,8 @@ COPY utils /utils
 
 WORKDIR /
 
+RUN pip install pyyaml
+
 ENTRYPOINT ["/bin/sh"]
 
 # FROM golang:1.17 AS builder

@@ -1,7 +1,7 @@
-import configparser
 import logging
 import os
 import sys
+import yaml
 
 from common.client import Client, ClientConfig
 
@@ -20,16 +20,16 @@ def init_logger():
         stream=sys.stdout,
     )
 
-
 def main():
     init_logger()
 
-    config = configparser.ConfigParser()
-    config.read("/config.ini")
+    with open("/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
 
     server_address = config["server"]["address"]
     iterations = int(config["loop"]["amount"])
     period = parse_period(config["loop"]["period"])
+    max_amount = int(config["batch"]["maxAmount"])
     cli_id = os.getenv("CLI_ID", "1")
 
     client_config = ClientConfig(
@@ -37,11 +37,11 @@ def main():
         server_address=server_address,
         loop_amount=iterations,
         loop_period=period,
+        max_amount=max_amount
     )
 
     client = Client(client_config)
     client.start_client_loop()
-
 
 if __name__ == "__main__":
     main()

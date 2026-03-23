@@ -6,15 +6,18 @@ import os
 from domain.agency_bet import AgencyBet
 from protocol.serializer import serialize_bet, deserialize_bet
 from protocol.message import Message, MessageType
+from utils.file_utils import iter_csv_rows
 
 log = logging.getLogger("log")
 
 class ClientConfig:
-    def __init__(self, client_id, server_address, loop_amount, loop_period):
+    def __init__(self, client_id, server_address, loop_amount, loop_period, max_amount):
         self.ID = client_id
         self.ServerAddress = server_address
         self.LoopAmount = loop_amount
         self.LoopPeriod = loop_period
+        self.max_amount = max_amount
+        log.info("action: config_batch | result: success | max_amount: %s", max_amount)
 
 class Client:
     def __init__(self, config):
@@ -52,8 +55,11 @@ class Client:
             return
 
         try:
-            agency_bet = self.build_bet()
-            self.send_bet(agency_bet)
+            batches = self.build_batches(self.config.max_amount)
+            for batch in batches:
+                self.send_batch(batch)
+                result = self.recv_result()
+                self.log_result(result, batch)
         except Exception as err:
             if self._shutting_down:
                 return
@@ -62,13 +68,6 @@ class Client:
         finally:
             if self.conn:
                 try:
-                    ack = self.recv_ack()
-                    confirmed_bet = deserialize_bet(ack.to_bytes())
-
-                    if ack.type == MessageType.ACK:
-                        log.info(f"action: apuesta_enviada | result: success | dni: {confirmed_bet.dni} | numero: {confirmed_bet.bet_number}")
-                    else:
-                        log.info(f"action: apuesta_enviada | result: fail | dni: {confirmed_bet.dni} | numero: {confirmed_bet.bet_number}")
                     self.conn.close()
                 except Exception:
                     pass
@@ -76,21 +75,45 @@ class Client:
 
             if self._shutting_down:
                 return
+    
+    def build_batches(self, max_amount):
+        batch_counter = 0
+        batches = []
+        message = Message(MessageType.BET)
+
+        for bet in self.iter_agency_bets():
+            bet_bytes = serialize_bet(bet)
+
+            if message.payload_count == max_amount:
+                batches.append(message)
+                batch_counter += 1
+                message = Message(MessageType.BET)
+
+            message.add_payload(bet_bytes)
+
+        if message.payload_count > 0:
+            batches.append(message)
+            batch_counter += 1
+        log.info("action: build_batch | result: success | batches: %s", len(batches))
+        return batches
 
 
-    def build_bet(self) -> AgencyBet:
-        return AgencyBet(
-            name=os.getenv("NOMBRE"),
-            lastname=os.getenv("APELLIDO"),
-            dni=os.getenv("DOCUMENTO"),
-            birth_date=os.getenv("NACIMIENTO"),
-            bet_number=int(os.getenv("NUMERO"))
-        )
+    def send_batch(self, batch: Message):
+        self.conn.sendall(batch.to_bytes())
 
-    def send_bet(self, bet: AgencyBet):
-        payload = serialize_bet(bet)
-        msg = Message(MessageType.BET, payload)
-        self.conn.sendall(msg.to_bytes())
-
-    def recv_ack(self) -> Message:
+    def recv_result(self) -> Message:
         return Message.from_socket(self.conn)
+    
+    def log_result(self, result: Message, batch: Message) -> None:
+        if result.type == MessageType.ACK:
+            log.info("action: batch_enviado | result: success | cantidad: %s", batch.payload_count)
+        elif result.type == MessageType.ERROR:
+            log.info("action: batch_enviado | result: fail | cantidad: %s", batch.payload_count)
+        else:
+            log.info("action: batch_enviado | result: unknown | cantidad: %s", batch.payload_count)
+
+    def iter_agency_bets(self):
+        path = os.getenv("BATCH_FILE")
+
+        for row in iter_csv_rows(path):
+            yield AgencyBet.from_row(row)

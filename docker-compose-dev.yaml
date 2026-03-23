@@ -15,14 +15,11 @@ services:
     image: client:latest
     volumes:
       - ./client/config.ini:/config.ini
+      - ./.data/agency-1.csv:/agency-1.csv
     entrypoint: python3 /main.py
     environment:
       - CLI_ID=1
-      - NOMBRE=NOMBRE1
-      - APELLIDO=APELLIDO1
-      - DOCUMENTO=11111111
-      - NACIMIENTO=1998-01-04
-      - NUMERO=1
+      - BATCH_FILE=./agency-1.csv
     networks:
       - testing_net
     depends_on:

@@ -12,9 +12,9 @@ def deserialize_bet(data: bytes) -> AgencyBet:
         raise ValueError("Invalid bet format")
 
     return AgencyBet(
-        name=parts[0],
-        lastname=parts[1],
-        dni=parts[2],
-        birth_date=parts[3],
-        bet_number=int(parts[4])
+        parts[0],
+        parts[1],
+        parts[2],
+        parts[3],
+        int(parts[4])
     )
