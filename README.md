@@ -479,6 +479,97 @@ La cantidad máxima de apuestas dentro de cada _batch_ debe ser configurable des
 
 Por su parte, el servidor deberá responder con éxito solamente si todas las apuestas del _batch_ fueron procesadas correctamente.
 
+#### Resolución
+
+En este ejercicio se modificó la arquitectura cliente-servidor para soportar el envío de múltiples apuestas en un mismo mensaje (batch), reduciendo la cantidad de comunicaciones y mejorando la eficiencia.
+
+Se adoptó un enfoque donde **todas las apuestas se envían utilizando el mismo formato de mensaje**, independientemente de si el batch contiene una o varias apuestas.
+
+---
+
+##### Cambios principales
+
+###### Unificación del formato de mensaje
+
+Se decidió reutilizar el mensaje de tipo `BET`, redefiniéndolo conceptualmente como una **colección de apuestas** en lugar de una única apuesta. De esta manera, se unifica el protocolo para todos los casos, incluyendo el envío de una sola apuesta.
+
+Esto implica que todo mensaje `BET` contiene:
+
+- `payload_len`: tamaño total del payload
+- `payload_count`: cantidad de apuestas incluidas en el mensaje
+- una lista de sub-payloads, donde cada uno representa una apuesta
+
+Formato del mensaje:
+`[type][payload_len][payload_count][payload_1_len][payload_1]...`
+
+
+Esto permite simplificar el protocolo, evitando la necesidad de definir múltiples tipos de mensajes (por ejemplo, `BET` vs `BET_BATCH`) y manteniendo una única estructura consistente.
+
+*Caso particular*: cuando se envía una sola apuesta, `payload_count = 1`, manteniendo exactamente el mismo formato.
+
+---
+
+###### Serialización y deserialización
+
+Se adaptaron las funciones de serialización y deserialización para soportar múltiples apuestas dentro de un mismo mensaje.
+
+Cada apuesta se serializa de forma individual y se encapsula como un sub-payload. En el servidor, los payloads son iterados y deserializados uno a uno para reconstruir las instancias de `AgencyBet`.
+
+---
+
+###### Origen de las apuestas
+
+Cada cliente obtiene las apuestas a partir de su archivo correspondiente:
+
+`.data/agency-{N}.csv`
+
+
+Estos archivos no contienen encabezado, por lo que se utiliza `csv.reader` para procesarlos, transformando cada fila en una instancia de `AgencyBet`.
+
+El path al archivo se define mediante la variable de entorno `BATCH_FILE`.
+
+Esto permite desacoplar la configuración del cliente del código y facilita el uso de volúmenes en Docker.
+
+---
+
+###### Configuración
+
+Se migró la lectura de configuración del cliente a `config.yaml`, alineándose con lo especificado en el enunciado.
+
+Inicialmente, durante la conversión de Go a Python, la configuración se encontraba en formato `config.ini`. Sin embargo, los tests del ejercicio utilizan y modifican archivos en formato YAML, por lo que fue necesario adaptar la implementación para leer correctamente desde `config.yaml`.
+
+En particular, el valor:
+```
+batch:
+  maxAmount: 99
+```
+
+define la cantidad máxima de apuestas por batch.
+
+---
+
+###### Descompresión de datasets
+
+Los archivos de apuestas son provistos comprimidos en `.data/dataset.zip`.
+
+Se implementó la función `ensure_datasets` dentro de `/tools/generator.py`, la cual se encarga de descomprimir automáticamente el dataset en caso de que los archivos `.csv` no estén presentes.
+
+Esta función es invocada al generar el `docker-compose-dev.yaml`, evitando la necesidad de intervención manual.
+
+---
+
+###### Uso de volúmenes
+
+Cada cliente monta mediante Docker un volumen con su archivo de apuestas correspondiente.
+
+Esto permite:
+
+- persistir los datos fuera de la imagen
+- evitar reconstrucciones innecesarias
+- aislar correctamente la información de cada cliente (`agency-{N}.csv`)
+- facilitar la ejecución de tests dinámicos
+
+
 ### Ejercicio N°7:
 
 Modificar los clientes para que notifiquen al servidor al finalizar con el envío de todas las apuestas y así proceder con el sorteo.

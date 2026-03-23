@@ -5,7 +5,6 @@ import yaml
 
 from common.client import Client, ClientConfig
 
-
 def parse_period(period_str):
     if period_str.endswith("ms"):
         return int(period_str[:-2]) / 1000
