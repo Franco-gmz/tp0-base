@@ -6,7 +6,6 @@ class MessageType(Enum):
     BET = 1
     ACK = 2
     ERROR = 3
-    BET_BATCH = 4
 
 MAX_SIZE = 65535
 MAX_PACKET_SIZE = 8192
