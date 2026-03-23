@@ -532,6 +532,29 @@ Esto permite desacoplar la configuración del cliente del código y facilita el 
 
 ---
 
+###### Validación de tamaño del mensaje
+
+Se incorporó una validación explícita del tamaño total del mensaje antes de su envío, para asegurar el cumplimiento de la restricción del enunciado que establece que los paquetes no deben exceder los **8kB**.
+
+Para ello se diferencian dos límites:
+
+- `MAX_SIZE = 65535`: límite técnico impuesto por el uso de campos de longitud de 2 bytes
+- `MAX_PACKET_SIZE = 8192`: límite funcional requerido por el ejercicio
+
+La validación se realiza al serializar el mensaje:
+
+```python
+if self.payload_len > MAX_SIZE:
+    raise ValueError("Payload exceeds protocol limit")
+
+if HEADER_BYTES + self.payload_len > MAX_PACKET_SIZE:
+    raise ValueError("Payload exceeds 8KB limit")
+```
+
+De esta manera, se controla tanto que el payload pueda representarse correctamente dentro del protocolo como que el tamaño total transmitido no supere los 8kB.
+
+---
+
 ###### Configuración
 
 Se migró la lectura de configuración del cliente a `config.yaml`, alineándose con lo especificado en el enunciado.
@@ -568,7 +591,6 @@ Esto permite:
 - evitar reconstrucciones innecesarias
 - aislar correctamente la información de cada cliente (`agency-{N}.csv`)
 - facilitar la ejecución de tests dinámicos
-
 
 ### Ejercicio N°7:
 
