@@ -58,13 +58,8 @@ def store_agency_bets(bets: list[AgencyBet], agency) -> None:
     store_bets(bet_collection)
 
 def has_won_bet(agency_bet: AgencyBet) -> bool:
-    try:
-        bet = Bet("0", agency_bet.name, agency_bet.lastname, agency_bet.dni, agency_bet.birth_date, agency_bet.bet_number)
-    except Exception as e:
-        logging.info(
-                "has_won_bet error con birt: %s and error: %s",
-                agency_bet.birth_date, e
-            )
+    # Agency is not used in the method but it is required for the constructor
+    bet = Bet("0", agency_bet.name, agency_bet.lastname, agency_bet.dni, agency_bet.birth_date, agency_bet.bet_number)
     return has_won(bet)
 
 def load_agency_bets() -> list[AgencyBet]:

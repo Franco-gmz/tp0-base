@@ -605,6 +605,88 @@ Las funciones `load_bets(...)` y `has_won(...)` son provistas por la cátedra y 
 
 No es correcto realizar un broadcast de todos los ganadores hacia todas las agencias, se espera que se informen los DNIs ganadores que correspondan a cada una de ellas.
 
+#### Resolución
+
+##### Servidor
+
+| Método | Tipo | Descripción |
+|-------|------|------------|
+| `__init__` | Public | Inicializa el socket del servidor, las estructuras compartidas de clientes/agencias, los flags del sorteo (`_draw_started`, `_draw_done`) y los mecanismos de sincronización (`Lock` y `Condition`). |
+| `run` | Public | Loop principal del servidor. Acepta conexiones entrantes y crea un thread daemon por cliente para procesar mensajes en paralelo. |
+| `__accept_new_connection` | Private | Bloquea hasta aceptar una nueva conexión, registra el evento en logs y devuelve el socket del cliente. |
+| `__add_client` | Private | Registra un cliente nuevo y lo marca inicialmente como `NOT_FINISH`. |
+| `__remove_client` | Private | Elimina un cliente de las estructuras internas del servidor (`_client_sockets`, `_client_status`, `_agency_by_client`). |
+| `__close_all_clients` | Private | Cierra todos los sockets de clientes activos y limpia su estado asociado. |
+| `__close_server` | Private | Cierra el socket del servidor y detiene el loop principal de aceptación de conexiones. |
+| `__handle_signal` | Private | Atiende `SIGTERM` y ejecuta un shutdown ordenado del servidor y de los clientes conectados. |
+| `__handle_client_connection` | Private | Maneja el ciclo de vida completo de una conexión cliente: recibe mensajes y delega en handlers según el tipo (`BET`, `FINISH_BETS`, `GET_WINNERS`). |
+| `__handle_bet` | Private | Deserializa apuestas, vincula el socket con su agencia, persiste las apuestas y responde con `ACK`. |
+| `__bind_agency_id` | Private | Asocia un `client_sock` con su `agency_id` si todavía no estaba registrado. |
+| `__handle_finish_bets` | Private | Marca que una agencia terminó de enviar apuestas. Si todas finalizaron y el sorteo aún no comenzó, reserva su ejecución, corre el sorteo una única vez, publica los resultados y notifica a los threads en espera. |
+| `__handle_get_winners` | Private | Bloquea el thread del cliente hasta que el sorteo esté completamente listo y luego responde solo con los ganadores de la agencia asociada al socket. |
+| `__run_draw` | Private | Carga todas las apuestas persistidas, identifica las ganadoras y arma una estructura `agency -> lista de DNIs ganadores`, que luego será publicada por el handler de finalización. |
+
+##### Estrategia de sincronización
+
+| Recurso | Tipo | Uso | Qué protege / coordina | Comportamiento |
+|--------|------|-----|-------------------------|---------------|
+| `_state_lock` | `Lock` | Exclusión mutua | `_client_sockets`, `_client_status`, `_agency_by_client` | Evita condiciones de carrera al modificar estructuras compartidas de clientes y agencias. |
+| `_draw_condition` | `Condition` (sobre `_state_lock`) | Coordinación entre threads | `_draw_started`, `_draw_done`, `_winners_by_agency` | Permite que los threads de `GET_WINNERS` esperen hasta que el sorteo termine completamente. |
+| `_draw_started` | Flag compartido | Reserva de ejecución | Inicio del sorteo | Garantiza que solo un thread ejecute `__run_draw()`. |
+| `_draw_done` | Flag compartido | Publicación de disponibilidad | Estado final del sorteo | Indica que los resultados ya fueron calculados y publicados, por lo que los clientes pueden recibir respuesta. |
+| `with _state_lock` | Bloque crítico | Lectura/escritura atómica | Estado compartido general | Asegura consistencia en accesos a estructuras internas. |
+| `with _draw_condition` | Bloque crítico + sincronización | Espera y publicación del sorteo | Estado del draw | Usa el mismo lock para proteger el estado y coordinar `wait/notify`. |
+| `_draw_condition.wait()` | Espera bloqueante | En `GET_WINNERS` | `_draw_done` | El thread libera el lock y queda dormido hasta que el sorteo termine. |
+| `_draw_condition.notify_all()` | Señalización | Luego de publicar resultados | Threads esperando ganadores | Despierta a todos los clientes que estaban esperando respuesta. |
+
+---
+
+###### Resumen
+
+- **`_state_lock`** protege las estructuras compartidas del servidor.
+- **`_draw_condition`** coordina el evento global “el sorteo terminó”.
+- **`_draw_started`** evita que más de un thread ejecute el sorteo.
+- **`_draw_done`** indica que los resultados ya están listos para responder consultas.
+
+---
+
+##### Cliente
+
+| Método | Tipo | Descripción |
+|-------|------|------------|
+| `__init__` | Public | Inicializa el cliente con su configuración, estado interno y handler de señales (`SIGTERM`). |
+| `create_client_socket` | Public | Crea la conexión TCP con el servidor usando la dirección configurada. Loguea error si falla. |
+| `handle_signal` | Public | Maneja `SIGTERM`, marca el cliente como en shutdown y cierra la conexión activa. |
+| `start_client_loop` | Public | Flujo principal del cliente: conecta al servidor, envía apuestas en batches, espera respuestas, notifica finalización y consulta ganadores. |
+| `build_batches` | Private | Construye mensajes `BET` agrupando apuestas en batches de tamaño máximo configurado. |
+| `iter_agency_bets` | Private | Itera sobre el archivo CSV de entrada y genera objetos `AgencyBet`. |
+| `send_batch` | Private | Envía un mensaje `BET` al servidor serializado en bytes. |
+| `recv_result` | Private | Recibe y deserializa un mensaje desde el servidor. |
+| `notify_without_payload` | Private | Envía mensajes sin payload (`FINISH_BETS`, `GET_WINNERS`) incluyendo el `agency_id`. |
+| `log_result` | Private | Loguea el resultado de envío de un batch (`ACK`, `ERROR`, etc.). |
+| `log_winners_result` | Private | Loguea la cantidad de ganadores recibidos desde el servidor. |
+
+---
+
+###### Flujo del cliente
+
+1. Se establece conexión con el servidor.
+2. Se leen las apuestas desde archivo (`CSV`).
+3. Se agrupan en batches (`BET`) y se envían secuencialmente.
+4. Por cada batch se espera un `ACK` o `ERROR`.
+5. Se envía `FINISH_BETS` indicando fin de envío.
+6. Se envía `GET_WINNERS`.
+7. El cliente queda bloqueado hasta recibir los resultados.
+8. Se loguea la cantidad de ganadores y se cierra la conexión.
+
+---
+
+#### Resultados de los test
+
+![Resultados de ej7](tests/ej7-tests.png)
+
+---
+
 ## Parte 3: Repaso de Concurrencia
 En este ejercicio es importante considerar los mecanismos de sincronización a utilizar para el correcto funcionamiento de la persistencia.
 

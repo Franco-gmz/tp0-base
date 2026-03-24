@@ -4,7 +4,7 @@ import signal
 import os
 
 from domain.agency_bet import AgencyBet
-from protocol.serializer import serialize_bet, deserialize_bet
+from protocol.serializer import serialize_bet
 from protocol.message import Message, MessageType
 from utils.file_utils import iter_csv_rows
 
@@ -19,7 +19,7 @@ class ClientConfig:
         self.max_amount = max_amount
 
 class Client:
-    def __init__(self, config):
+    def __init__(self, config: ClientConfig):
         self.config = config
         self.conn = None
         self._shutting_down = False
@@ -54,7 +54,7 @@ class Client:
             return
 
         try:
-            batches = self.build_batches(self.config.max_amount)
+            batches = self.build_batches()
             for batch in batches:
                 self.send_batch(batch)
                 result = self.recv_result()
@@ -79,24 +79,21 @@ class Client:
             if self._shutting_down:
                 return
     
-    def build_batches(self, max_amount):
-        batch_counter = 0
+    def build_batches(self):
         batches = []
         message = Message(MessageType.BET, self.config.ID)
 
         for bet in self.iter_agency_bets():
             bet_bytes = serialize_bet(bet)
 
-            if message.payload_count == max_amount:
+            if message.payload_count == self.config.max_amount:
                 batches.append(message)
-                batch_counter += 1
                 message = Message(MessageType.BET, self.config.ID)
 
             message.add_payload(bet_bytes)
 
         if message.payload_count > 0:
             batches.append(message)
-            batch_counter += 1
         return batches
 
 
@@ -106,21 +103,21 @@ class Client:
     def recv_result(self) -> Message:
         return Message.from_socket(self.conn)
     
-    def notify_without_payload(self, type: MessageType):
-        notification = Message(type)
+    def notify_without_payload(self, msg_type: MessageType):
+        notification = Message(msg_type, self.config.ID)
         self.conn.sendall(notification.to_bytes())
     
     def log_result(self, result: Message, batch: Message) -> None:
         if result.type == MessageType.ACK:
             log.info("action: batch_enviado | result: success | cantidad: %s", batch.payload_count)
         elif result.type == MessageType.ERROR:
-            log.info("action: batch_enviado | result: fail")
+            log.info("action: batch_enviado | result: fail | cantidad: %s", batch.payload_count)
         else:
             log.info("action: batch_enviado | result: unknown")
 
     def log_winners_result(self, result: Message) -> None:
         if result.type == MessageType.WINNERS_RESULTS:
-            log.info(f"action: consulta_ganadores | result: success | cant_ganadores: {result.payload_count}")
+            log.info("action: consulta_ganadores | result: success | cant_ganadores: %s", result.payload_count)
         elif result.type == MessageType.ERROR:
             log.info("action: consulta_ganadores | result: fail")
         else:

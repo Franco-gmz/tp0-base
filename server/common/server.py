@@ -5,12 +5,13 @@ import threading
 
 from protocol.serializer import deserialize_bet
 from protocol.message import Message, MessageType
-from common.utils import has_won_bet, load_agency_bets, store_agency_bets, load_bets, has_won
+from common.utils import has_won_bet, load_agency_bets, store_agency_bets
 
 NOT_FINISH = False
 FINISH = True
 
 class Server:
+    
     # Initializes the server socket, shared state for connected clients,
     # draw results, and the lock used to protect concurrent access.
     def __init__(self, port, listen_backlog, nclients = 5):
@@ -23,6 +24,7 @@ class Server:
         self._agency_by_client = {} 
         self.total_agencies = nclients
 
+        self._draw_started = False
         self._draw_done = False
         self._winners_by_agency = {}
 
@@ -30,27 +32,32 @@ class Server:
         self._state_lock = threading.Lock()
         self._draw_condition = threading.Condition(self._state_lock)
 
-        signal.signal(signal.SIGTERM, self.handle_signal)
+        signal.signal(signal.SIGTERM, self.__handle_signal)
 
     # Registers a newly connected client and marks it as not finished yet.
     # Uses the shared-state lock because client status is global state.
-    def add_client(self, client):
+    def __add_client(self, client):
         with self._state_lock:
             self._client_sockets.append(client)
             self._client_status[client] = NOT_FINISH
 
     # Removes a client from the server state and deletes its associated data.
     # Uses the shared-state lock because it modifies shared structures.
-    def remove_client(self, client):
+    def __remove_client(self, client):
         with self._state_lock:
             if client in self._client_sockets:
                 self._client_sockets.remove(client)
             self._client_status.pop(client, None)
             self._agency_by_client.pop(client, None)
 
-    # Removes a client from the server state and deletes its associated data.
-    # Uses the shared-state lock because it modifies shared structures.
-    def close_all_clients(self):
+    # Closes all active client connections and removes them from server state.
+    # Iterates over a copy of the client sockets list to avoid modification issues.
+    # For each client:
+    # - Attempts to retrieve its address (ip, port) for logging purposes.
+    # - Closes the socket and logs success or failure.
+    # - Ensures the client is removed from internal structures regardless of errors.
+    # Does NOT use a lock directly here, but remove_client() handles synchronization.
+    def __close_all_clients(self):
         for client in list(self._client_sockets):
             try:
                 peername = client.getpeername()
@@ -69,11 +76,11 @@ class Server:
                     peername[0], peername[1], e
                 )
             finally:
-                self.remove_client(client)
+                self.__remove_client(client)
 
     # Closes the listening server socket and stops the main accept loop.
     # Used when the server is shutting down.
-    def close_server(self):
+    def __close_server(self):
         self._server_running = False
         try:
             self._server_socket.close()
@@ -83,11 +90,11 @@ class Server:
 
     # Handles SIGTERM by closing the server socket and all connected clients.
     # Allows the server to stop gracefully.
-    def handle_signal(self, sig, frame):
+    def __handle_signal(self, sig, frame):
         if sig == signal.SIGTERM:
             logging.info("action: receive_signal | result: success | signal: SIGTERM")
-            self.close_server()
-            self.close_all_clients()
+            self.__close_server()
+            self.__close_all_clients()
 
     # Main server loop: accepts new client connections and starts
     # one worker thread per client to process messages in parallel.
@@ -95,7 +102,7 @@ class Server:
         while self._server_running:
             try:
                 client_sock = self.__accept_new_connection()
-                self.add_client(client_sock)
+                self.__add_client(client_sock)
 
                 thread = threading.Thread(
                     target=self.__handle_client_connection,
@@ -156,7 +163,7 @@ class Server:
                     peername[0], peername[1], e
                 )
             finally:
-                self.remove_client(client_sock)
+                self.__remove_client(client_sock)
 
     # Processes a BET message: deserializes bets, stores them,
     # associates the client with its agency, and replies with ACK.
@@ -167,15 +174,10 @@ class Server:
 
             if bets:
                 with self._state_lock:
-                    if client_sock not in self._agency_by_client:
-                        self._agency_by_client[client_sock] = agency_id
+                    self.__bind_agency_id(client_sock, agency_id)
 
             store_agency_bets(bets,agency_id)
-
-            logging.info(
-                "action: apuesta_recibida | result: success | cantidad: %s",
-                msg.payload_count
-            )
+            logging.info("action: apuesta_recibida | result: success | cantidad: %s", msg.payload_count)
 
             ack_msg = Message(MessageType.ACK)
             client_sock.sendall(ack_msg.to_bytes())
@@ -192,7 +194,6 @@ class Server:
     # If all agencies have finished and the draw was not executed yet,
     # this thread becomes responsible for running it once.
     def __handle_finish_bets(self, client_sock):
-        logging.info("action: finish bets enter | result: success")
         must_run_draw = False
 
         with self._draw_condition:
@@ -201,22 +202,30 @@ class Server:
             if (
                 len(self._client_status) == self.total_agencies
                 and all(self._client_status.values())
-                and not self._draw_done
+                and not self._draw_started
             ):
-                self._draw_done = True
+                self._draw_started = True
                 must_run_draw = True
 
         if must_run_draw:
-            self.__run_draw()
+            winners_by_agency = self.__run_draw()
 
             with self._draw_condition:
+                self._winners_by_agency = winners_by_agency
+                self._draw_done = True
                 self._draw_condition.notify_all()
 
             logging.info("action: sorteo | result: success")
 
-    # Processes a winners query for the client's agency.
-    # Returns ERROR if the draw is not ready yet, otherwise
-    # sends back only the winning DNIs for that agency.
+    # Handles a GET_WINNERS request from a client.
+    # Blocks the calling thread until the draw is completed using a condition variable.
+    # - Acquires the shared lock through the condition.
+    # - Waits (releasing the lock temporarily) until _draw_done becomes True.
+    # - Once notified, retrieves the agency_id associated with the client.
+    # - Fetches the winners list for that agency from shared state.
+    # After releasing the lock, builds and sends a WINNERS_RESULTS message
+    # containing the DNIs of the winning bets for that agency.
+    # Only this thread is blocked; other client threads continue executing normally.
     def __handle_get_winners(self, client_sock):
         with self._draw_condition:
             while not self._draw_done:
@@ -242,8 +251,7 @@ class Server:
             if has_won_bet(bet):
                 winners_by_agency.setdefault(bet.agency, []).append(bet.dni)
 
-        with self._draw_condition:
-            self._winners_by_agency = winners_by_agency
+        return winners_by_agency
 
     # Blocks waiting for a new incoming client connection,
     # logs the event, and returns the accepted client socket.
@@ -255,3 +263,8 @@ class Server:
             addr[0], addr[1]
         )
         return client_sock
+    
+    # Link a client socket to its agency id
+    def __bind_agency_id(self, client_sock, agency_id):
+        if client_sock not in self._agency_by_client:
+            self._agency_by_client[client_sock] = agency_id
