@@ -1,5 +1,6 @@
 import csv
 import datetime
+import logging
 import time
 from domain.agency_bet import AgencyBet
 
@@ -49,9 +50,36 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
-def store_agency_bets(bets: list[AgencyBet]) -> None:
+def store_agency_bets(bets: list[AgencyBet], agency) -> None:
     bet_collection = []
     for bet in bets:
-        bet = Bet("1", bet.name, bet.lastname, bet.dni, bet.birth_date, bet.bet_number)
+        bet = Bet(agency, bet.name, bet.lastname, bet.dni, bet.birth_date, bet.bet_number)
         bet_collection.append(bet)
     store_bets(bet_collection)
+
+def has_won_bet(agency_bet: AgencyBet) -> bool:
+    try:
+        bet = Bet("0", agency_bet.name, agency_bet.lastname, agency_bet.dni, agency_bet.birth_date, agency_bet.bet_number)
+    except Exception as e:
+        logging.info(
+                "has_won_bet error con birt: %s and error: %s",
+                agency_bet.birth_date, e
+            )
+    return has_won(bet)
+
+def load_agency_bets() -> list[AgencyBet]:
+    agency_bets = []
+
+    for bet in load_bets():
+        agency_bets.append(
+            AgencyBet(
+                bet.first_name,
+                bet.last_name,
+                bet.document,
+                str(bet.birthdate),
+                bet.number,
+                bet.agency,
+            )
+        )
+
+    return agency_bets

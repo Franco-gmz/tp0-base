@@ -1,5 +1,5 @@
-def server_template():
-    return """  server:
+def server_template(clients):
+    return f"""  server:
     container_name: server
     image: server:latest
     volumes:
@@ -7,9 +7,10 @@ def server_template():
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - CLIENTS={clients}
     networks:
       - testing_net
 """
 
-def write_server(file):
-    file.write(server_template())
+def write_server(file, clients):
+    file.write(server_template(int(clients)))

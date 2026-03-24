@@ -1,5 +1,6 @@
 class AgencyBet:
-    def __init__(self, name, lastname, dni, birth_date, bet_number):
+    def __init__(self, name, lastname, dni, birth_date, bet_number, agency = None):
+        self.agency = agency
         self.name = name
         self.lastname = lastname
         self.dni = dni

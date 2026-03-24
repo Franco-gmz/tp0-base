@@ -26,7 +26,6 @@ def ensure_datasets():
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(data_dir)
 
-
 def main():
     if len(sys.argv) != 3:
         print("Uso: generator.py <archivo_salida> <cantidad_clientes>")
@@ -39,10 +38,9 @@ def main():
 
     with open(output_file, "w") as file:
         write_header(file)
-        write_server(file)
+        write_server(file, clients)
         write_clients(file, clients)
         write_networks(file)
-
 
 if __name__ == "__main__":
     main()

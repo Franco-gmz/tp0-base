@@ -8,6 +8,7 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - CLIENTS=3
     networks:
       - testing_net
   client1:
@@ -20,6 +21,36 @@ services:
     environment:
       - CLI_ID=1
       - BATCH_FILE=./agency-1.csv
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  client2:
+    container_name: client2
+    image: client:latest
+    volumes:
+      - ./client/config.ini:/config.ini
+      - ./.data/agency-2.csv:/agency-2.csv
+    entrypoint: python3 /main.py
+    environment:
+      - CLI_ID=2
+      - BATCH_FILE=./agency-2.csv
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  client3:
+    container_name: client3
+    image: client:latest
+    volumes:
+      - ./client/config.ini:/config.ini
+      - ./.data/agency-3.csv:/agency-3.csv
+    entrypoint: python3 /main.py
+    environment:
+      - CLI_ID=3
+      - BATCH_FILE=./agency-3.csv
     networks:
       - testing_net
     depends_on:

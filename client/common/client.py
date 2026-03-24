@@ -17,7 +17,6 @@ class ClientConfig:
         self.LoopAmount = loop_amount
         self.LoopPeriod = loop_period
         self.max_amount = max_amount
-        log.info("action: config_batch | result: success | max_amount: %s", max_amount)
 
 class Client:
     def __init__(self, config):
@@ -60,6 +59,10 @@ class Client:
                 self.send_batch(batch)
                 result = self.recv_result()
                 self.log_result(result, batch)
+            self.notify_without_payload(MessageType.FINISH_BETS)
+            self.notify_without_payload(MessageType.GET_WINNERS)
+            results = self.recv_result()
+            self.log_winners_result(results)
         except Exception as err:
             if self._shutting_down:
                 return
@@ -79,7 +82,7 @@ class Client:
     def build_batches(self, max_amount):
         batch_counter = 0
         batches = []
-        message = Message(MessageType.BET)
+        message = Message(MessageType.BET, self.config.ID)
 
         for bet in self.iter_agency_bets():
             bet_bytes = serialize_bet(bet)
@@ -87,14 +90,13 @@ class Client:
             if message.payload_count == max_amount:
                 batches.append(message)
                 batch_counter += 1
-                message = Message(MessageType.BET)
+                message = Message(MessageType.BET, self.config.ID)
 
             message.add_payload(bet_bytes)
 
         if message.payload_count > 0:
             batches.append(message)
             batch_counter += 1
-        log.info("action: build_batch | result: success | batches: %s", len(batches))
         return batches
 
 
@@ -104,13 +106,25 @@ class Client:
     def recv_result(self) -> Message:
         return Message.from_socket(self.conn)
     
+    def notify_without_payload(self, type: MessageType):
+        notification = Message(type)
+        self.conn.sendall(notification.to_bytes())
+    
     def log_result(self, result: Message, batch: Message) -> None:
         if result.type == MessageType.ACK:
             log.info("action: batch_enviado | result: success | cantidad: %s", batch.payload_count)
         elif result.type == MessageType.ERROR:
-            log.info("action: batch_enviado | result: fail | cantidad: %s", batch.payload_count)
+            log.info("action: batch_enviado | result: fail")
         else:
-            log.info("action: batch_enviado | result: unknown | cantidad: %s", batch.payload_count)
+            log.info("action: batch_enviado | result: unknown")
+
+    def log_winners_result(self, result: Message) -> None:
+        if result.type == MessageType.WINNERS_RESULTS:
+            log.info(f"action: consulta_ganadores | result: success | cant_ganadores: {result.payload_count}")
+        elif result.type == MessageType.ERROR:
+            log.info("action: consulta_ganadores | result: fail")
+        else:
+            log.info("action: consulta_ganadores | result: unknown")
 
     def iter_agency_bets(self):
         path = os.getenv("BATCH_FILE")
