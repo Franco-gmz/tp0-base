@@ -592,6 +592,10 @@ Esto permite:
 - aislar correctamente la información de cada cliente (`agency-{N}.csv`)
 - facilitar la ejecución de tests dinámicos
 
+##### Resultados de los tests
+
+![Resultados de ej6](tests/ej6-tests.png)
+
 ### Ejercicio N°7:
 
 Modificar los clientes para que notifiquen al servidor al finalizar con el envío de todas las apuestas y así proceder con el sorteo.
