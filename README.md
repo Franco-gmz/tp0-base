@@ -655,16 +655,16 @@ No es correcto realizar un broadcast de todos los ganadores hacia todas las agen
 | Método | Tipo | Descripción |
 |-------|------|------------|
 | `__init__` | Public | Inicializa el cliente con su configuración, estado interno y handler de señales (`SIGTERM`). |
-| `create_client_socket` | Public | Crea la conexión TCP con el servidor usando la dirección configurada. Loguea error si falla. |
-| `handle_signal` | Public | Maneja `SIGTERM`, marca el cliente como en shutdown y cierra la conexión activa. |
+| `__create_client_socket` | Private | Crea la conexión TCP con el servidor usando la dirección configurada. Loguea error si falla. |
+| `__handle_signal` | Private | Maneja `SIGTERM`, marca el cliente como en shutdown y cierra la conexión activa. |
 | `start_client_loop` | Public | Flujo principal del cliente: conecta al servidor, envía apuestas en batches, espera respuestas, notifica finalización y consulta ganadores. |
-| `build_batches` | Private | Construye mensajes `BET` agrupando apuestas en batches de tamaño máximo configurado. |
-| `iter_agency_bets` | Private | Itera sobre el archivo CSV de entrada y genera objetos `AgencyBet`. |
-| `send_batch` | Private | Envía un mensaje `BET` al servidor serializado en bytes. |
-| `recv_result` | Private | Recibe y deserializa un mensaje desde el servidor. |
-| `notify_without_payload` | Private | Envía mensajes sin payload (`FINISH_BETS`, `GET_WINNERS`) incluyendo el `agency_id`. |
-| `log_result` | Private | Loguea el resultado de envío de un batch (`ACK`, `ERROR`, etc.). |
-| `log_winners_result` | Private | Loguea la cantidad de ganadores recibidos desde el servidor. |
+| `__build_batches` | Private | Construye mensajes `BET` agrupando apuestas en batches de tamaño máximo configurado. |
+| `__iter_agency_bets` | Private | Itera sobre el archivo CSV de entrada y genera objetos `AgencyBet`. |
+| `__send_batch` | Private | Envía un mensaje `BET` al servidor serializado en bytes. |
+| `__recv_result` | Private | Recibe y deserializa un mensaje desde el servidor. |
+| `__notify_without_payload` | Private | Envía mensajes sin payload (`FINISH_BETS`, `GET_WINNERS`) incluyendo el `agency_id`. |
+| `__log_result` | Private | Loguea el resultado de envío de un batch (`ACK`, `ERROR`, etc.). |
+| `__log_winners_result` | Private | Loguea la cantidad de ganadores recibidos desde el servidor. |
 
 ---
 

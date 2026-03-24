@@ -23,9 +23,9 @@ class Client:
         self.config = config
         self.conn = None
         self._shutting_down = False
-        signal.signal(signal.SIGTERM, self.handle_signal)
+        signal.signal(signal.SIGTERM, self.__handle_signal)
 
-    def create_client_socket(self):
+    def __create_client_socket(self):
         try:
             host, port = self.config.ServerAddress.split(":")
             self.conn = socket.create_connection((host, int(port)))
@@ -38,7 +38,7 @@ class Client:
             return err
         return None
 
-    def handle_signal(self, sig, frame):
+    def __handle_signal(self, sig, frame):
         if sig == signal.SIGTERM:
             log.info("action: receive_signal | result: success | signal: SIGTERM")
             self._shutting_down = True
@@ -49,20 +49,20 @@ class Client:
         if self._shutting_down:
             return
 
-        err = self.create_client_socket()
+        err = self.__create_client_socket()
         if err:
             return
 
         try:
-            batches = self.build_batches()
+            batches = self.__build_batches()
             for batch in batches:
-                self.send_batch(batch)
-                result = self.recv_result()
-                self.log_result(result, batch)
-            self.notify_without_payload(MessageType.FINISH_BETS)
-            self.notify_without_payload(MessageType.GET_WINNERS)
-            results = self.recv_result()
-            self.log_winners_result(results)
+                self.__send_batch(batch)
+                result = self.__recv_result()
+                self.__log_result(result, batch)
+            self.__notify_without_payload(MessageType.FINISH_BETS)
+            self.__notify_without_payload(MessageType.GET_WINNERS)
+            results = self.__recv_result()
+            self.__log_winners_result(results)
         except Exception as err:
             if self._shutting_down:
                 return
@@ -79,11 +79,11 @@ class Client:
             if self._shutting_down:
                 return
     
-    def build_batches(self):
+    def __build_batches(self):
         batches = []
         message = Message(MessageType.BET, self.config.ID)
 
-        for bet in self.iter_agency_bets():
+        for bet in self.__iter_agency_bets():
             bet_bytes = serialize_bet(bet)
 
             if message.payload_count == self.config.max_amount:
@@ -97,17 +97,17 @@ class Client:
         return batches
 
 
-    def send_batch(self, batch: Message):
+    def __send_batch(self, batch: Message):
         self.conn.sendall(batch.to_bytes())
 
-    def recv_result(self) -> Message:
+    def __recv_result(self) -> Message:
         return Message.from_socket(self.conn)
     
-    def notify_without_payload(self, msg_type: MessageType):
+    def __notify_without_payload(self, msg_type: MessageType):
         notification = Message(msg_type, self.config.ID)
         self.conn.sendall(notification.to_bytes())
     
-    def log_result(self, result: Message, batch: Message) -> None:
+    def __log_result(self, result: Message, batch: Message) -> None:
         if result.type == MessageType.ACK:
             log.info("action: batch_enviado | result: success | cantidad: %s", batch.payload_count)
         elif result.type == MessageType.ERROR:
@@ -115,7 +115,7 @@ class Client:
         else:
             log.info("action: batch_enviado | result: unknown")
 
-    def log_winners_result(self, result: Message) -> None:
+    def __log_winners_result(self, result: Message) -> None:
         if result.type == MessageType.WINNERS_RESULTS:
             log.info("action: consulta_ganadores | result: success | cant_ganadores: %s", result.payload_count)
         elif result.type == MessageType.ERROR:
@@ -123,7 +123,7 @@ class Client:
         else:
             log.info("action: consulta_ganadores | result: unknown")
 
-    def iter_agency_bets(self):
+    def __iter_agency_bets(self):
         path = os.getenv("BATCH_FILE")
 
         for row in iter_csv_rows(path):
