@@ -698,6 +698,14 @@ En este ejercicio es importante considerar los mecanismos de sincronización a u
 
 Modificar el servidor para que permita aceptar conexiones y procesar mensajes en paralelo. En caso de que el alumno implemente el servidor en Python utilizando _multithreading_,  deberán tenerse en cuenta las [limitaciones propias del lenguaje](https://wiki.python.org/moin/GlobalInterpreterLock).
 
+#### Resolución
+
+Escenario contemplado en el Ejercicio N°7.
+
+##### Resultados de los tests
+
+![Resultados de ej8](tests/ej8-tests.png)
+
 ## Condiciones de Entrega
 Se espera que los alumnos realicen un _fork_ del presente repositorio para el desarrollo de los ejercicios y que aprovechen el esqueleto provisto tanto (o tan poco) como consideren necesario.
 
@@ -710,11 +718,3 @@ Se proveen [pruebas automáticas](https://github.com/7574-sistemas-distribuidos/
 
 El incumplimiento de las pruebas es condición de desaprobación, pero su cumplimiento no es suficiente para la aprobación.  Se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección informados  [en el campus](https://campusgrado.fi.uba.ar/mod/page/view.php?id=73393).
 Respetar el formato y contenido las entradas de logs descritas en los ejercicios, pues son las que se chequean en cada uno de los tests.
-
-#### Resolución
-
-Escenario contemplado en el Ejercicio N°7.
-
-##### Resultados de los tests
-
-![Resultados de ej8](tests/ej8-tests.png)
